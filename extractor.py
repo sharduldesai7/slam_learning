@@ -20,6 +20,8 @@ class Extractor():
         self.K = K
         self.Kinv = np.linalg.inv(self.K)
 
+    def normalize(self, pts):
+        return np.dot(self.Kinv, add_ones(pts).T).T[:, 0:2]
 
     def denormalize(self, pt):
         ret = np.dot(self.K,np.array([pt[0], pt[1], 1.0]))
@@ -50,8 +52,9 @@ class Extractor():
         if len(ret) > 0:
             ret = np.array(ret)
 
-            ret[:, 0, :] = np.dot(self.Kinv, add_ones(ret[:, 0, :]).T).T[:, 0:2]
-            ret[:, 1, :] = np.dot(self.Kinv, add_ones(ret[:, 1, :]).T).T[:, 0:2]
+            #normalize co-ordinates
+            ret[:, 0, :] = self.normalize(ret[:, 0, :])
+            ret[:, 1, :] = self.normalize(ret[:, 1, :])
 
             model, inliers = ransac((ret[:, 0], ret[:, 1]),
                                     FundamentalMatrixTransform,
@@ -59,6 +62,8 @@ class Extractor():
                                     residual_threshold = 1,
                                     max_trials = 100)
 
+            s, v, d = np.linalg.svd(model.params)
+            f_est = np.sqrt(2)/((v[0] + v[1])/2)     #estimated focal length
             ret = ret[inliers]
 
         #return
