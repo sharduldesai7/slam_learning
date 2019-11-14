@@ -14,7 +14,7 @@ from extractor import Extractor
 
 W = 1920//2
 H = 1080//2
-F = 1       #camera focal length
+F = 240       #camera focal length - found through trial and error. Not sure how to exactly find focal length. The parameter v must be around 1
 
 disp = Display(W,H)
 K = np.array([[F,0,W//2],[0,F,H//2],[0, 0, 1]])     #camera intrinsic matrix
@@ -29,11 +29,14 @@ fe = Extractor(K)
 def process_frame(img):
     img = cv2.resize(img, (W,H))
     #kp1, des1 = orb.detectAndCompute(img, None)
-    matches = fe.extract(img)
+    matches, pose = fe.extract(img)
+
+    if pose is None:
+        return
 
     if matches is None:
         return
-
+    print (pose)
     #print ("len of matches: %s" % len(matches))
     for pt1, pt2 in matches:
         #print (pt1, pt2)

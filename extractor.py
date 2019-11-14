@@ -9,6 +9,22 @@ from skimage.transform import EssentialMatrixTransform
 def add_ones(x):
     return np.concatenate([x, np.ones((x.shape[0], 1))], axis = 1)
 
+def extractRt(E):       #E is essential matrix
+    #for calculating R for extrinsic camera matrix
+    W = np.mat([[0,-1,0],[1,0,0],[0,0,1]], dtype = float)
+    U, w, Vt = np.linalg.svd(E)
+    assert np.linalg.det(U) > 0
+    if np.linalg.det(Vt) < 0:
+        Vt *= -1.0
+
+    R = np.dot(np.dot(U, W), Vt)        #Rotation matrix - diagonals of R must be 1
+    if np.sum(R.diagonal()) < 0:
+        R = np.dot(np.dot(U, W.T), Vt)
+    t = U[:, 2]
+    Rt = np.concatenate([R,t.reshape(3,1)], axis = 1)
+
+    return Rt
+
 class Extractor():
 #    GX = 16//2
 #    GY = 12//2
@@ -49,6 +65,7 @@ class Extractor():
                     ret.append((kp1, kp2))
         
         #filter: using fundamental filter - governs how points correspond to each other
+        Rt = None
         if len(ret) > 0:
             ret = np.array(ret)
 
@@ -57,16 +74,18 @@ class Extractor():
             ret[:, 1, :] = self.normalize(ret[:, 1, :])
 
             model, inliers = ransac((ret[:, 0], ret[:, 1]),
-                                    FundamentalMatrixTransform,
+                                    #FundamentalMatrixTransform,
+                                    EssentialMatrixTransform,
                                     min_samples = 8,
-                                    residual_threshold = 1,
+                                    #residual_threshold = 1,
+                                    residual_threshold = 0.05,
                                     max_trials = 100)
 
-            s, v, d = np.linalg.svd(model.params)
-            f_est = np.sqrt(2)/((v[0] + v[1])/2)     #estimated focal length
+            #All this normalization is to incorporate the camera calibration. This enables us to use EssentialMatrixTransform than FundamentalMatrixTransform. It has to make lesser calculations
             ret = ret[inliers]
-
+            Rt = extractRt(model.params)
+            
         #return
         self.last = {'kps' : kps, 'des' : des}
-        return ret
+        return ret, Rt
 
